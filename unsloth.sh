@@ -1,5 +1,14 @@
 #!/bin/bash
-if [ "$@" = "" ]; then
-    set -- bash
+set -e
+
+# Ensure we use the unsloth.sh as entrypoint
+if [ "$1" = "bash" ] || [ "$1" = "/bin/bash" ]; then
+    shift
 fi
-exec "$*"
+
+# If no command is provided, default to bash
+if [ $# -eq 0 ]; then
+    exec bash
+fi
+
+exec "$@"
