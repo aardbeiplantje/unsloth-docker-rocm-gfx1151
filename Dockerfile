@@ -45,5 +45,6 @@ ENV PATH="${ROCM_PATH}/bin:${PATH}"
 # RUN pip install unsloth
 
 WORKDIR /app
+COPY unsloth.sh /app
 
-CMD ["bash"]
+ENTRYPOINT ["/app/unsloth.sh"]
