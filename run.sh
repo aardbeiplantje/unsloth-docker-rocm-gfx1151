@@ -1,7 +1,7 @@
 #!/bin/bash
 DOCKER_IMAGE=${DOCKER_IMAGE:-local/ai/unsloth-gfx1151:latest}
 OPTS=""
-if [ "$@" = "" ]; then
+if [ x"$@" = x"" ]; then
     set -- \
         studio \
         --port 8888 \
