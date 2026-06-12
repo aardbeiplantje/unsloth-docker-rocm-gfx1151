@@ -1,0 +1,44 @@
+group "default" {
+  targets = ["local"]
+}
+group "release" {
+  targets = ["containers"]
+}
+group "local" {
+  targets = ["_local"]
+}
+variable "DOCKER_REGISTRY" {
+  default = "ghcr.io"
+}
+variable "DOCKER_REPOSITORY" {
+  default = "ai"
+}
+variable "DOCKER_IMAGE_NAME" {
+  default = "opencode"
+}
+variable "DOCKER_TAG" {
+  default = "latest"
+}
+variable "CACHEBUST" {
+  default = "1"
+}
+target "_common" {
+  context = "."
+  dockerfile = "Dockerfile"
+  platforms = ["linux/amd64"]
+  args = {
+    CACHEBUST = "${CACHEBUST}"
+  }
+  networks = ["host"]
+  buildkit = true
+}
+target "_local" {
+  inherits = ["_common"]
+  target = "runtime"
+  tags = [
+    "local/${DOCKER_REPOSITORY}/${DOCKER_IMAGE_NAME}:${DOCKER_TAG}",
+  ]
+  output = [
+    "type=docker,name=local/${DOCKER_REPOSITORY}/${DOCKER_IMAGE_NAME}:${DOCKER_TAG}"
+  ]
+}
