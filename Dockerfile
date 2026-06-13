@@ -13,8 +13,6 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     ca-certificates \
     python3 \
     python3-pip \
-    && apt update \
-    && apt upgrade --no-install-recommends -y \
     && useradd -m -s /bin/bash unsloth
 
 RUN mkdir -p /opt/rocm \
@@ -52,6 +50,13 @@ RUN \
     python3 -m pip install --prefer-binary --upgrade \
         https://rocm.frameworks.amd.com/whl/gfx1151/flash_attn-2.8.3-py3-none-any.whl
 
+# Install extra Unsloth dependencies
+RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+    --mount=target=/var/cache/apt,type=cache,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean \
+    && apt update && apt install -y \
+    cmake git libcurl4-openssl-dev flang pkg-config curl
+
 # Set environment variables for ROCm/Unsloth
 ENV ROCM_PATH=/opt/rocm
 ENV PATH="${ROCM_PATH}/bin:${PATH}"
@@ -70,6 +75,15 @@ RUN \
         UNSLOTH_LLAMA_CPP_PATH=/llama.cpp \
         UNSLOTH_ROCM_GFX_ARCH=gfx1151 \
         sh
+
+# Cache busting argument to force apt update
+ARG APT_CACHEBUST=1
+
+RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+    --mount=target=/var/cache/apt,type=cache,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean \
+    && apt update \
+    && apt upgrade --no-install-recommends -y
 
 # Volumes for Unsloth/HuggingFace data
 VOLUME ["/home/unsloth/.unsloth"]
