@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x
 
 # Ensure we use the unsloth.sh as entrypoint
 if [ "$1" = "bash" ] || [ "$1" = "/bin/bash" ]; then

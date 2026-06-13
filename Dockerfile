@@ -4,15 +4,14 @@ FROM ubuntu:24.04 AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install essential packages
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
-    --mount=target=/var/cache/apt,type=cache,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean \
-    && apt update && apt install -y \
-    wget \
-    gpg \
-    ca-certificates \
-    python3 \
-    python3-pip \
+RUN \
+    apt update \
+    && apt install -y \
+        wget \
+        gpg \
+        ca-certificates \
+        python3 \
+        python3-pip \
     && useradd -m -s /bin/bash unsloth
 
 RUN mkdir -p /opt/rocm \
@@ -51,10 +50,7 @@ RUN \
         https://rocm.frameworks.amd.com/whl/gfx1151/flash_attn-2.8.3-py3-none-any.whl
 
 # Install extra Unsloth dependencies
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
-    --mount=target=/var/cache/apt,type=cache,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean \
-    && apt update && apt install -y \
+RUN apt update && apt install -y \
     cmake git libcurl4-openssl-dev flang pkg-config curl
 
 # Set environment variables for ROCm/Unsloth

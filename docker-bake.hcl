@@ -26,10 +26,6 @@ target "_common" {
   context = "."
   dockerfile = "Dockerfile"
   platforms = ["linux/amd64"]
-  args = {
-    CACHEBUST = "${CACHEBUST}"
-    APT_CACHEBUST = "${CACHEBUST}"
-  }
   networks = ["host"]
   buildkit = true
 }
