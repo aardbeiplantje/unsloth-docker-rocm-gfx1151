@@ -13,6 +13,7 @@ else
 fi
 # debug:
 OPTS="-it --rm"
+ROCM_PATH=${ROCM_PATH:-/opt/rocm}
 docker stop unsloth >/dev/null 2>&1 || true
 docker rm unsloth >/dev/null 2>&1 || true
 exec docker run \
@@ -33,9 +34,14 @@ exec docker run \
     -v $UNSLOTH_DATA:/unsloth/studio \
     -v $HF_HOME:$HF_HOME \
     -v $HF_HUB_CACHE:$HF_HUB_CACHE \
+    -v $ROCM_PATH:/opt/rocm \
     -e HF_HOME \
     -e HF_TOKEN \
     -e HF_HUB_CACHE \
     -e UNSLOTH_DATA \
+    -e CUDA_VISIBLE_DEVICES="" \
+    -e TF_ENABLE_ONEDNN_OPTS=0 \
+    -e TF_XLA_FLAGS_DISABLED=1 \
+    -e ROCM_PATH=/opt/rocm \
     $DOCKER_IMAGE \
         "$@"

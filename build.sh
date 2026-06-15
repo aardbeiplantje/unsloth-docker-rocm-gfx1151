@@ -9,4 +9,7 @@ docker buildx create --use --name megabuilder \
   --platform linux/amd64,linux/arm64,linux/aarch64 \
   --buildkitd-flags '--allow-insecure-entitlement security.insecure'
 
-docker buildx bake --allow=fs.read=$ROCM_PATH --allow=security.insecure --allow=device --progress=plain
+docker buildx bake \
+  --allow=fs.read=$ROCM_PATH \
+  --allow=security.insecure \
+  --allow=device

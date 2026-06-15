@@ -5,6 +5,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install essential packages
 RUN \
+    --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+    --mount=target=/var/cache/apt,type=cache,sharing=locked \
     apt update \
     && apt install -y \
         wget \
@@ -24,8 +26,12 @@ RUN \
 ##     && wget -q https://repo.amd.com/rocm/tarball/therock-dist-linux-gfx1151-7.13.0.tar.gz -O - \
 ##         |tar xzf -
 
+ENV TMPDIR=/pip/tmp
 ENV XDG_CACHE_HOME=/pip
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
+ENV PIP_ROOT_USER_ACTION=ignore
+
+RUN mkdir -p $TMPDIR && chmod +s $TMPDIR
 
 # Install torch
 RUN \
@@ -60,19 +66,21 @@ RUN \
         uv==0.11.21
 
 # Install extra Unsloth dependencies
-RUN apt update && apt install -y \
-    cmake git libcurl4-openssl-dev flang pkg-config curl
+RUN \
+    --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+    --mount=target=/var/cache/apt,type=cache,sharing=locked \
+       apt update \
+    && apt install -y \
+        cmake git libcurl4-openssl-dev flang pkg-config curl
 
 # Set environment variables for ROCm/Unsloth
 ENV ROCM_PATH=/opt/rocm
 ENV PATH="${ROCM_PATH}/bin:${PATH}"
-ENV PATH=${ROCM_PATH}/bin:$PATH
 ENV LD_LIBRARY_PATH=${ROCM_PATH}/lib/
 ENV UNSLOTH_LLAMA_CPP_PATH=/unsloth/llama.cpp
 ENV UNSLOTH_STUDIO_HOME=/unsloth
 
 # Llama.cpp ROcm
-ENV TMPDIR=/dev/shm
 ENV HSA_OVERRIDE_GFX_VERSION=11.5.1
 ENV GGML_CUDA_ENABLE_UNIFIED_MEMORY=1
 ENV ROCBLAS_USE_HIPBLASLT=0
@@ -92,14 +100,6 @@ ENV LLAMA_LOG_TIMESTAMPS=1
 ENV LLAMA_LOG_PREFIX=1
 ENV HSA_FORCE_FINE_GRAIN_PCIE=1
 
-WORKDIR /unsloth/llama.cpp
-ARG LEMONADE_LLAMACPP_VERSION=b1282
-ADD https://github.com/lemonade-sdk/llamacpp-rocm/releases/download/${LEMONADE_LLAMACPP_VERSION}/llama-${LEMONADE_LLAMACPP_VERSION}-ubuntu-rocm-gfx1151-x64.zip llama-rocm.zip
-RUN    \
-       unzip llama-rocm.zip \
-    && touch .unsloth-studio-owned \
-    && rm -f llama-rocm.zip
-
 WORKDIR /
 
 # Install Unsloth
@@ -107,7 +107,6 @@ RUN umask 0022
 RUN \
     --security=insecure \
     --mount=type=bind,from=rocmdata,target=/opt/rocm \
-    --mount=target=/pip,type=cache,sharing=locked \
     if [ ! -c /dev/kfd ]; then mknod -m 666 /dev/kfd c 235 0; fi && \
     rocminfo && \
     amd-smi && \
@@ -124,14 +123,34 @@ RUN \
         UNSLOTH_VERBOSE=1 \
         bash -x
 RUN chmod og+rx /unsloth/llama.cpp
+WORKDIR /unsloth/llama.cpp
+ARG LEMONADE_LLAMACPP_VERSION=b1282
+ADD https://github.com/lemonade-sdk/llamacpp-rocm/releases/download/${LEMONADE_LLAMACPP_VERSION}/llama-${LEMONADE_LLAMACPP_VERSION}-ubuntu-rocm-gfx1151-x64.zip llama-rocm.zip
+RUN    \
+       echo A|unzip -qq llama-rocm.zip \
+    && chmod +x llama-* \
+    && touch .unsloth-studio-owned \
+    && rm -f llama-rocm.zip
+
+RUN \
+    --mount=target=/pip,type=cache,sharing=locked \
+    python3 -m pip install --prefer-binary --upgrade \
+        tf-keras --no-deps && \
+    python3 -m pip install --prefer-binary --upgrade \
+        https://repo.radeon.com/rocm/manylinux/rocm-rel-7.2.4/tensorflow_rocm-2.20.0.dev0%2Bselfbuilt-cp312-cp312-manylinux_2_28_x86_64.whl
+
 
 # Cache busting argument to force apt update
 ARG APT_CACHEBUST=1
 
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+RUN \
+    --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean \
     && apt update \
+    && apt install -y \
+        libnuma1 \
+        libgfortran5 \
     && apt upgrade --no-install-recommends -y
 
 # Volumes for Unsloth/HuggingFace data
