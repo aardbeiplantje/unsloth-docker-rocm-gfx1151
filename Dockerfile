@@ -12,12 +12,17 @@ RUN \
         ca-certificates \
         python3 \
         python3-pip \
+        unzip \
+        libcurl4 \
+        libssl3 \
+        libgomp1 \
+        libatomic1 \
     && useradd -m -s /bin/bash unsloth
 
-RUN mkdir -p /opt/rocm \
-    && cd /opt/rocm \
-    && wget -q https://repo.amd.com/rocm/tarball/therock-dist-linux-gfx1151-7.13.0.tar.gz -O - \
-        |tar xzf -
+## RUN mkdir -p /opt/rocm \
+##     && cd /opt/rocm \
+##     && wget -q https://repo.amd.com/rocm/tarball/therock-dist-linux-gfx1151-7.13.0.tar.gz -O - \
+##         |tar xzf -
 
 ENV XDG_CACHE_HOME=/pip
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
@@ -27,7 +32,7 @@ RUN \
     --mount=target=/pip,type=cache,sharing=locked \
     python3 -m pip install --prefer-binary --upgrade \
         --index-url https://repo.amd.com/rocm/whl/gfx1151/ \
-        "rocm[libraries,devel]" \
+        "rocm[libraries]" \
         torch \
         torchvision \
         torchaudio
@@ -49,6 +54,11 @@ RUN \
     python3 -m pip install --prefer-binary --upgrade \
         https://rocm.frameworks.amd.com/whl/gfx1151/flash_attn-2.8.3-py3-none-any.whl
 
+RUN \
+    --mount=target=/pip,type=cache,sharing=locked \
+    python3 -m pip install --prefer-binary --upgrade \
+        uv==0.11.21
+
 # Install extra Unsloth dependencies
 RUN apt update && apt install -y \
     cmake git libcurl4-openssl-dev flang pkg-config curl
@@ -58,19 +68,62 @@ ENV ROCM_PATH=/opt/rocm
 ENV PATH="${ROCM_PATH}/bin:${PATH}"
 ENV PATH=${ROCM_PATH}/bin:$PATH
 ENV LD_LIBRARY_PATH=${ROCM_PATH}/lib/
+ENV UNSLOTH_LLAMA_CPP_PATH=/unsloth/llama.cpp
+ENV UNSLOTH_STUDIO_HOME=/unsloth
+
+# Llama.cpp ROcm
+ENV TMPDIR=/dev/shm
+ENV HSA_OVERRIDE_GFX_VERSION=11.5.1
+ENV GGML_CUDA_ENABLE_UNIFIED_MEMORY=1
+ENV ROCBLAS_USE_HIPBLASLT=0
+ENV HIP_VISIBLE_DEVICES=0
+ENV HSA_ENABLE_SDMA=0
+ENV GGML_HIP_FORCE_RS_GPU=1
+ENV GGML_HIP_FORCE_KV_GPU=1
+ENV GGML_HIP_GRAPHS=0
+ENV GGML_HIP_ALLOC_GRAPH_RESERVE=2048
+ENV ROCM_METADATA_WAIT_TIMEOUT=100
+ENV ROCM_ALLOW_INT8_MIXED_PRECISION=1
+ENV HIPBLASLT_LOG_MASK=32
+ENV HIP_FORCE_DEV_KERNARG=1
+ENV GGML_CUDA_FORCE_MMQ=1
+ENV LLAMA_LOG_COLORS=1
+ENV LLAMA_LOG_TIMESTAMPS=1
+ENV LLAMA_LOG_PREFIX=1
+ENV HSA_FORCE_FINE_GRAIN_PCIE=1
+
+WORKDIR /unsloth/llama.cpp
+ARG LEMONADE_LLAMACPP_VERSION=b1282
+ADD https://github.com/lemonade-sdk/llamacpp-rocm/releases/download/${LEMONADE_LLAMACPP_VERSION}/llama-${LEMONADE_LLAMACPP_VERSION}-ubuntu-rocm-gfx1151-x64.zip llama-rocm.zip
+RUN    \
+       unzip llama-rocm.zip \
+    && touch .unsloth-studio-owned \
+    && rm -f llama-rocm.zip
+
+WORKDIR /
 
 # Install Unsloth
+RUN umask 0022
 RUN \
+    --security=insecure \
+    --mount=type=bind,from=rocmdata,target=/opt/rocm \
     --mount=target=/pip,type=cache,sharing=locked \
+    if [ ! -c /dev/kfd ]; then mknod -m 666 /dev/kfd c 235 0; fi && \
+    rocminfo && \
+    amd-smi && \
     wget https://unsloth.ai/install.sh -O -| \
         UNSLOTH_NO_TORCH=1 \
         UNSLOTH_PYTHON=3.12 \
         UNSLOTH_STUDIO_HOME=/unsloth \
         UNSLOTH_PYTORCH_MIRROR=https://repo.amd.com/rocm/whl/gfx1151/ \
         UNSLOTH_AMD_ROCM_MIRROR=https://repo.amd.com/rocm/whl/gfx1151/ \
-        UNSLOTH_LLAMA_CPP_PATH=/llama.cpp \
-        UNSLOTH_ROCM_GFX_ARCH=gfx1151 \
-        sh
+        UNSLOTH_LLAMA_CPP_PATH=/unsloth/llama.cpp \
+        HSA_ENABLE_DXG_DETECTION=1 \
+        UNSLOTH_DISABLE_LEMONADE_ROCM=0 \
+        UNSLOTH_ENABLE_AMD_SMI=1 \
+        UNSLOTH_VERBOSE=1 \
+        bash -x
+RUN chmod og+rx /unsloth/llama.cpp
 
 # Cache busting argument to force apt update
 ARG APT_CACHEBUST=1
@@ -88,9 +141,11 @@ VOLUME ["/home/unsloth/.unsloth"]
 WORKDIR /app
 COPY unsloth.sh /app
 RUN chmod +x /app/unsloth.sh
+RUN mkdir -p /pip \
+    && chown unsloth:unsloth /pip
+RUN mkdir -p /unsloth/ \
+    && chown unsloth:unsloth /unsloth/
 
 USER unsloth
 
 ENTRYPOINT ["/app/unsloth.sh"]
-CMD ["unsloth", "studio"]
-

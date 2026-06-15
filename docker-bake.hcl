@@ -22,12 +22,19 @@ variable "DOCKER_TAG" {
 variable "CACHEBUST" {
   default = "1"
 }
+variable "ROCM_PATH" {
+  default = "/opt/rocm"
+}
 target "_common" {
   context = "."
   dockerfile = "Dockerfile"
   platforms = ["linux/amd64"]
   networks = ["host"]
   buildkit = true
+  entitlements = ["security.insecure"] 
+  contexts = {
+    rocmdata = "${ROCM_PATH}"
+  }
 }
 target "_local" {
   inherits = ["_common"]
